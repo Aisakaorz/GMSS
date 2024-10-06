@@ -4,16 +4,16 @@ import numpy as np
 import config
 from utils import calc_con_loss
 from dataset import fre_stack, spa_stack, create_contrastive, create_graph, create_jigsaw
+from tqdm import tqdm
 from model import SelfSupervisedTrain, SelfSupervisedTest
 from AutoWeight import AutomaticWeightedLoss
 import time
 import os
-from tqdm import tqdm
+import pdb
 
-
-path = 'GNN_NPY_DATASETS/SEED/data_dependent'
-# path = 'GNN_NPY_DATASETS/MPED/data_dependent'
-# path = 'GNN_NPY_DATASETS/SEED/data_independent'
+path = '/GNN_NPY_DATASETS/SEED/data_dependent'
+# path = '/GNN_NPY_DATASETS/MPED/data_dependent'
+# path = '/GNN_NPY_DATASETS/SEED/data_independent'
 batch_size = config.batch_size
 epochs = config.epochs
 lr = config.lr
@@ -48,20 +48,12 @@ def validateTest(validateNet, test_data, test_label, people, highest_acc):
         epoch_loss += float(loss.item())
 
     ACC = correct_pred / ((ind + 1) * batch_size)
-
-    log = [f'{DATASET}\t{people}\t{ACC:.4f}\n']
-    file_path = f'results/{DATASET}_unsupervised.txt'
-    # 检查文件是否存在，如果不存在则创建
-    if not os.path.exists(file_path):
-        with open(file_path, 'w') as f:
-            pass
-    with open(file_path, 'a') as f:
-        f.writelines(log)
+    with open(f'./{DATASET}_unsupervised.txt', 'a') as f:
+        f.write(f'{DATASET}\t{people}\t{ACC:.4f}\n')
 
     # print(f'Test loss {epoch_loss/(ind+1):.4f} Test ACC@1 {ACC:.4f}')
 
     return highest_acc, ACC
-
 
 def validateTrain(train_data, train_label, test_data, test_label, people, HC):
 
@@ -133,16 +125,16 @@ def validateTrain(train_data, train_label, test_data, test_label, people, HC):
             print('-' * 100)
             print()
 
-
 def train(train_data, train_label, test_data, test_label, people):
 
     HC = None
-    if 'SEED' in DATASET:
-        HC = 3
-    elif 'SEED_IV' in DATASET:
+
+    if 'SEED_IV' in path:
         HC = 4
-    elif 'MPED' in DATASET:
+    elif 'MPED' in path:
         HC = 7
+    else:
+        HC = 3
     assert HC is not None
 
     awl = AutomaticWeightedLoss(3)
@@ -153,8 +145,7 @@ def train(train_data, train_label, test_data, test_label, people):
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.1, patience=5, verbose=True,
                                                            threshold=0.0001,
                                                            threshold_mode='rel', cooldown=0, min_lr=0, eps=1e-8)
-
-    for epoch in tqdm(range(epochs)):
+    for epoch in range(epochs):
 
         floader = create_jigsaw(fre_stack, train_data, shuffle=True, batch_size=batch_size)
         sloader = create_jigsaw(spa_stack, train_data, shuffle=True, batch_size=batch_size)
@@ -166,7 +157,7 @@ def train(train_data, train_label, test_data, test_label, people):
         epoch_loss = 0.0
         epoch_loss1 = 0.0
         epoch_loss2 = 0.0
-        epoch_loss3 = 0.0   # contrastive loss
+        epoch_loss3 = 0.0 # contrastive loss
 
         correct_pred1 = 0
         correct_pred2 = 0
@@ -200,7 +191,7 @@ def train(train_data, train_label, test_data, test_label, people):
 
         denominator = (ind+1)*batch_size
         
-        if epoch % 5 == 0:
+        if epoch%5==0:   
             torch.save(net.state_dict(), f'unsupervisedDirectory/pretrain/{DATASET}_checkpoint/checkpoint_{people}.pkl')
             validateTrain(train_data, train_label, test_data, test_label, people, HC)
 
@@ -209,27 +200,16 @@ def train(train_data, train_label, test_data, test_label, people):
               f'cLoss[{epoch_loss3/(ind+1):.4f}] \n'
               f'ACC@1 fACC[{correct_pred1/denominator:.4f}] sACC[{correct_pred2/denominator:.4f}] \n')
 
-
 def runs(people):
     print(f'load object {people}\'s data.....')
     train_data = np.load(path + '/' + 'train_dataset_{}.npy'.format(people))
     train_label = np.load(path + '/' + 'train_labelset_{}.npy'.format(people))
     test_data = np.load(path + '/' + 'test_dataset_{}.npy'.format(people))
     test_label = np.load(path + '/' + 'test_labelset_{}.npy'.format(people))
-
-    train_data = train_data[:, :, :5].repeat(2, axis=0)
-    train_label = train_label.repeat(2, axis=0)
-    train_label = train_label + 1
-    test_data = test_data[:, :, :5].repeat(2, axis=0)
-    test_label = test_label.repeat(2, axis=0)
-    test_label = test_label + 1
-
     print('loaded!')
 
     train(train_data, train_label, test_data, test_label, people)
 
-
 if __name__ == '__main__':
-    # for i in range(45):
-    #     runs(i+1)
-    runs(1)
+    for i in range(45):
+        runs(i+1)

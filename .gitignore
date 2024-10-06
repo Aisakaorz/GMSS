@@ -1,0 +1,7 @@
+/SEED_jointly_checkpoint/
+/results/
+/unsupervisedDirectory/
+/GNN_NPY_DATASETS/SEED/data_dependent/test_dataset_1.npy
+/GNN_NPY_DATASETS/SEED/data_dependent/test_labelset_1.npy
+/GNN_NPY_DATASETS/SEED/data_dependent/train_dataset_1.npy
+/GNN_NPY_DATASETS/SEED/data_dependent/train_labelset_1.npy

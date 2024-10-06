@@ -2,7 +2,7 @@ import torch
 
 
 epochs = 100
-batch_size = 4
+batch_size = 256 
 lr = 0.01
 weight_decay = 8e-5
 drop_rate = 0.25 

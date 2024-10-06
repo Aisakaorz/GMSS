@@ -1,17 +1,16 @@
 import numpy as np
+import os
 import torch
 from scipy import sparse
 import itertools
-from torch_geometric.data import Data, DataLoader
+from torch_geometric.data import Data, DataLoader, Dataset
 import config
 import scipy
 import random
 
-path = 'GNN_NPY_DATASETS/SEED/data_dependent'
-batch_size = config.batch_size
+path = '/GNN_NPY_DATASETS/SEED/data_dependent'
 
 def fre_stack(data, pseudo_label):
-    ###这个函数的主要功能是根据给定的伪标签（pseudo_label）对输入的数据（data）进行重新排序和堆叠，最终返回重新排序后的数据。
     data = data.T
     P_hat = np.array(list(itertools.permutations(list(range(5)), 5)))  # Full Permutation
     selected = P_hat[pseudo_label]
@@ -23,7 +22,6 @@ def fre_stack(data, pseudo_label):
     return ret.T
 
 def spa_stack(data, pseudo_label):
-    ##根据给定的伪标签（pseudo_label）对输入的EEG数据进行重新排序和堆叠，最后返回重新排列后的EEG数据。
     k_permutations = np.load('max_hamming_set_10_128.npy')
     selected = k_permutations[pseudo_label]
 
@@ -32,7 +30,6 @@ def spa_stack(data, pseudo_label):
     EEG_dic[1] = np.vstack((data[5:8], data[14:17]))
     EEG_dic[2] = np.vstack((data[23:26], data[32:35]))
     EEG_dic[3] = np.vstack((np.vstack((data[41:44], data[50:52])), data[60]))
-    # EEG_dic[3] = np.vstack(np.vstack((data[41:44], data[50:52])), np.expand_dims(data[60], axis=0))
     EEG_dic[4] = np.vstack((data[8:11], np.vstack((data[17:20], data[26:29]))))
     EEG_dic[5] = np.vstack((data[35:38], data[44:47]))
     EEG_dic[6] = np.vstack((data[52:55], data[57:60]))
@@ -46,43 +43,7 @@ def spa_stack(data, pseudo_label):
 
     return ret
 
-# import numpy as np
-
-# import numpy as np
-
-# def spa_stack(data, pseudo_label):
-#     k_permutations = np.load('max_hamming_set_10_128.npy')
-#     selected = k_permutations[pseudo_label]
-
-#     EEG_dic = {}
-#     EEG_dic[0] = data[:5]
-#     EEG_dic[1] = np.vstack((data[5:8], data[14:17]))
-#     EEG_dic[2] = np.vstack((data[23:26], data[32:35]))
-    
-#     # Adjust dimensions to match before stacking
-#     data_3_1 = np.expand_dims(data[60], axis=0)
-#     data_3_2 = np.vstack((data[41:44], data[50:52]))
-#     EEG_dic[3] = np.vstack((data_3_2, data_3_1))
-
-#     EEG_dic[4] = np.vstack(data[8:11], np.vstack((data[17:20], data[26:29])))
-#     EEG_dic[5] = np.vstack((data[35:38], data[44:47]))
-#     EEG_dic[6] = np.vstack((data[52:55], data[57:60]))
-#     EEG_dic[7] = np.vstack((data[11:14], data[20:23]))
-#     EEG_dic[8] = np.vstack((data[29:32], data[38:41]))
-    
-#     # Adjust dimensions to match before stacking
-#     data_9_1 = np.vstack((data[47:50], data[55:57]))
-#     data_9_2 = np.expand_dims(data[61], axis=0)
-#     EEG_dic[9] = np.vstack((data_9_1, data_9_2))
-
-#     ret = np.vstack((EEG_dic[selected[0]], EEG_dic[selected[1]]))
-#     for i in range(2, len(selected)):
-#         ret = np.vstack((ret, EEG_dic[selected[i]]))
-
-#     return ret
-
 def adjacency():
-    ##构建一个稀疏矩阵，该稀疏矩阵表示了一个图的邻接矩阵，其中节点之间的连接关系由 row_ 和 col_ 数组定义，边的权重由 weight_ 数组定义
     row_ = np.array(
         [0, 0, 1, 1, 1, 2, 3, 3, 3, 3, 3, 4, 4, 4, 4, 4, 5, 5, 6, 6, 7, 7, 8, 8, 9, 9, 10, 10, 11, 11, 12, 12,
          13, 14, 14, 15, 15, 16, 16, 17, 17, 18, 18, 19, 19, 20, 20, 21, 21, 22, 23, 23, 24, 24, 25, 25, 26, 26,
@@ -122,8 +83,6 @@ def data_reader(index):
     train_label = np.load(path + '/' + 'train_labelset_{}.npy'.format(index))
     test_data = np.load(path + '/' + 'test_dataset_{}.npy'.format(index))
     test_label = np.load(path + '/' + 'test_labelset_{}.npy'.format(index))
-    # print('train:',train_data.shape)
-    # print('test:',test_data.shape)
 
     return train_data, train_label, test_data, test_label
 
@@ -140,7 +99,6 @@ def create_graph(data, label, shuffle=False, batch_size=100, drop_last=True):
         
         y = torch.tensor(label[i], dtype=torch.long)
         graph.append(Data(x=x, edge_index=edge_index, edge_attr=edge_attr, y=y))
-
     return DataLoader(graph, batch_size=batch_size, shuffle=shuffle, drop_last=drop_last, num_workers=config.num_workers)
 
 def create_jigsaw(stack, data, jigsaw_parts=120, shuffle=False, batch_size=100, drop_last=True, num_jigsaw=1):
@@ -161,7 +119,7 @@ def create_jigsaw(stack, data, jigsaw_parts=120, shuffle=False, batch_size=100, 
             graph.append(Data(x=x, edge_index=edge_index, edge_attr=edge_attr, y=y))
     return DataLoader(graph, batch_size=batch_size, shuffle=shuffle, drop_last=drop_last, num_workers=config.num_workers)
 
-def create_contrastive(fstack, sstack, data, timeseed=10086, fjigsaw_parts=120, sjigsaw_parts=128, shuffle=True, batch_size=100, drop_last=True, num_jigsaw=1):
+def create_contrastive(fstack, sstack, data, timeseed, fjigsaw_parts=120, sjigsaw_parts=128, shuffle=True, batch_size=100, drop_last=True, num_jigsaw=1):
     '''
     combine fre & spa data agumentation
     '''

@@ -7,12 +7,13 @@ from utils import calc_con_loss
 from model import JointlyTrainModel
 from AutoWeight import AutomaticWeightedLoss
 import os
-from itertools import cycle, islice
-from tqdm import tqdm
+from itertools import cycle
+import time
+import pdb
 
-path = 'GNN_NPY_DATASETS/SEED/data_dependent'
-# path = 'GNN_NPY_DATASETS/MPED/data_dependent'
-# path = 'GNN_NPY_DATASETS/SEED/data_independent'
+path = '/GNN_NPY_DATASETS/SEED/data_dependent'
+# path = '/GNN_NPY_DATASETS/MPED/data_dependent'
+# path = '/GNN_NPY_DATASETS/SEED/data_independent'
 batch_size = config.batch_size
 epochs = config.epochs
 lr = config.lr
@@ -29,24 +30,19 @@ if DEPENDENT == 'data_independent':
 
 def writeEachEpoch(people, epoch, batchsize, lr, temperature, acc):
     import model
-    log = [f'{DATASET}\t{people}\t{temperature}\t{batchsize}\t{epoch}\t{lr}\t{model.drop_rate}\t{acc:.4f}\n']
-    file_path = f'results/{DATASET}_All_log.txt'
-    # 检查文件是否存在，如果不存在则创建
-    if not os.path.exists(file_path):
-        with open(file_path, 'w') as f:
-            pass
-    with open(file_path, 'a') as f:
+    log = []
+    log.append(f'{DATASET}\t{people}\t{temperature}\t'
+               f'{batchsize}\t{epoch}\t{lr}\t{model.drop_rate}\t{acc:.4f}\n')
+    with open(
+            f'/xxx/{DATASET}_All_log.txt',
+            'a') as f:
         f.writelines(log)
 
 
 def updatelog(people, epoch, acc):
-    log = [f'{DATASET}\t{people}\t{epoch}\t{lr}\t{batch_size}\t{acc:.4f}\n']
-    file_path = f'results/{DATASET}_UPDATE_LOG.txt'
-    # 检查文件是否存在，如果不存在则创建
-    if not os.path.exists(file_path):
-        with open(file_path, 'w') as f:
-            pass
-    with open(file_path, 'a') as f:
+    log = []
+    log.append(f'{DATASET}\t{people}\t{epoch}\t{lr}\t{batch_size}\t{acc:.4f}\n')
+    with open('/xxx/{DATASET}_UPDATE_LOG.txt', 'a') as f:
         f.writelines(log)
 
 
@@ -54,7 +50,6 @@ def test(net, test_data, test_label, people, highest_acc, epoch):
     criterion = nn.CrossEntropyLoss().to(device)
 
     gloader = create_graph(test_data, test_label, shuffle=True, batch_size=batch_size, drop_last=True)
-
     net.testmode = True
     net.eval()
     epoch_loss = 0.0
@@ -97,12 +92,12 @@ def train(train_data, train_label, test_data, test_label, people):
         highest_acc = check['ACC']
     
     HC = None
-    if 'SEED' in DATASET:
-        HC = 3
-    elif 'SEED_IV' in DATASET:
+    if 'SEED_IV' in DATASET:
         HC = 4
     elif 'MPED' in DATASET:
         HC = 7
+    else:
+        HC = 3
     assert HC is not None
 
     awl = AutomaticWeightedLoss(4)
@@ -117,13 +112,14 @@ def train(train_data, train_label, test_data, test_label, people):
     floader = create_jigsaw(fre_stack, train_data, shuffle=True, batch_size=batch_size, num_jigsaw=num_jigsaw)
     sloader = create_jigsaw(spa_stack, train_data, shuffle=True, batch_size=batch_size, num_jigsaw=num_jigsaw)
     gloader = create_graph(train_data, train_label, shuffle=True, batch_size=batch_size)
-    gloader = islice(cycle(gloader), len(list(floader)))
-    train_loader1 = create_contrastive(fre_stack, spa_stack, train_data.copy(), shuffle=True, batch_size=batch_size, num_jigsaw=num_jigsaw)
-    train_loader2 = create_contrastive(fre_stack, spa_stack, train_data.copy(), shuffle=True, batch_size=batch_size,  num_jigsaw=num_jigsaw)
+    timeseed = time.time()
+    train_loader1 = create_contrastive(fre_stack, spa_stack, train_data.copy(), timeseed, shuffle=True, batch_size=batch_size, num_jigsaw=num_jigsaw)
+    train_loader2 = create_contrastive(fre_stack, spa_stack, train_data.copy(), timeseed, shuffle=True, batch_size=batch_size,  num_jigsaw=num_jigsaw)
 
-    for epoch in tqdm(range(epochs)):
+    for epoch in range(epochs):
 
-        loader = zip(floader, sloader, gloader, train_loader1, train_loader2)
+        loader = zip(floader, sloader, cycle(gloader), train_loader1, train_loader2)
+
         epoch_loss = 0.0
         epoch_loss1 = 0.0
         epoch_loss2 = 0.0
@@ -141,9 +137,9 @@ def train(train_data, train_label, test_data, test_label, people):
             _, pred1 = torch.max(x1, dim=1)
             _, pred2 = torch.max(x2, dim=1)
             _, pred3 = torch.max(x3, dim=1)
-            correct_pred1 += sum([1 for a, b in zip(pred1, y1) if a == b])
-            correct_pred2 += sum([1 for a, b in zip(pred2, y2) if a == b])
-            correct_pred3 += sum([1 for a, b in zip(pred3, y3) if a == b])
+            correct_pred1 += sum([1 for a,b in zip(pred1, y1) if a==b])
+            correct_pred2 += sum([1 for a,b in zip(pred2, y2) if a==b])
+            correct_pred3 += sum([1 for a,b in zip(pred3, y3) if a==b])
             loss1 = criterion(x1, y1)
             loss2 = criterion(x2, y2)
             loss3 = criterion(x3, y3)
@@ -164,7 +160,7 @@ def train(train_data, train_label, test_data, test_label, people):
 
         scheduler.step(epoch_loss)
 
-        denominator = (ind + 1) * batch_size
+        denominator = (ind+1)*batch_size
         if epoch % 5 == 0:
             print()
             print(f'-----highest_acc {highest_acc:.4f} current_acc {current_acc:.4f}-----')
@@ -177,34 +173,17 @@ def train(train_data, train_label, test_data, test_label, people):
               f'gLoss[{epoch_loss3/(ind+1):.4f}] cLoss[{epoch_loss4/(ind+1):.4f}] \n'
               f'ACC@1 fACC[{correct_pred1/denominator:.4f}] sACC[{correct_pred2/denominator:.4f}] gACC[{correct_pred3/denominator:.4f}] \n')
 
-
 def runs(people):
     print(f'load object {people}\'s data.....')
-    train_data = np.load(path + '/' + 'train_dataset_{}.npy'.format(people))        # (9, 62, 53001)
-    train_label = np.load(path + '/' + 'train_labelset_{}.npy'.format(people))      # (9, 1)
-    test_data = np.load(path + '/' + 'test_dataset_{}.npy'.format(people))          # (6, 62, 53001)
-    test_label = np.load(path + '/' + 'test_labelset_{}.npy'.format(people))        # (6, 1)
-
-    train_data = train_data[:, :, :5].repeat(2, axis=0)     # (18, 62, 5)
-    train_label = train_label.repeat(2, axis=0)             # (18, 1)
-    train_label = train_label + 1
-    test_data = test_data[:, :, :5].repeat(2, axis=0)       # (12, 62, 5)
-    test_label = test_label.repeat(2, axis=0)               # (12, 1)
-    # test_label = test_label + 1
-
+    train_data = np.load(path + '/' + 'train_dataset_{}.npy'.format(people))
+    train_label = np.load(path + '/' + 'train_labelset_{}.npy'.format(people))
+    test_data = np.load(path + '/' + 'test_dataset_{}.npy'.format(people))
+    test_label = np.load(path + '/' + 'test_labelset_{}.npy'.format(people))
     print('loaded!')
-    print('train:', type(train_data), train_data.shape)
-    print('train_label:', type(train_label), train_label.shape)
-    print('test:', type(test_data), test_data.shape)
-    print('test_label:', type(test_label), test_label.shape)
-
-    # print("train_label: ", train_label)
-    # print("test_label: ", test_label)
 
     train(train_data, train_label, test_data, test_label, people)
 
 
 if __name__ == '__main__':
-    # for i in range(45):
-    #     runs(i+1)
-    runs(1)
+    for i in range(45):
+        runs(i+1)

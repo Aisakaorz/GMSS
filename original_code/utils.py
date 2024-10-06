@@ -1,8 +1,10 @@
 import torch
+import numpy as np
 import config
 import numpy as np
 import itertools
 from scipy.spatial.distance import cdist
+import h5py
 
 
 def hamming_set(num_crops, num_permutations, selection, output_file_name):

@@ -1,3 +1,4 @@
+import torch
 import torch.nn as nn
 import torch_geometric.nn as gnn
 import torch.nn.functional as F
@@ -11,8 +12,7 @@ class JointlyTrainModel(nn.Module):
         super(JointlyTrainModel, self).__init__()
         self.batch = batch
         self.testmode = testmode
-        # linearsize = 512
-        linearsize = 128
+        linearsize = 512
 
 
         # K = [1,2,3,4,5,6,7,8,9,10]
